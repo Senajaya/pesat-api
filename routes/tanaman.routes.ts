@@ -20,6 +20,17 @@ const createTanamanSchema = z.object({
   fotoUrl: z.string().trim().url("URL foto tidak valid").max(500).optional().nullable(),
 });
 
+const updateTanamanSchema = z.object({
+  namaTanaman: z.string().trim().min(2, "Nama tanaman minimal 2 karakter").max(100),
+  varietas: z.string().trim().max(100).optional().nullable(),
+  tanggalTanam: z.coerce.date(),
+  jumlahBibit: z.string().trim().min(1, "Jumlah bibit wajib diisi").max(50),
+  modalAwal: z.coerce.number().min(0, "Modal awal tidak boleh negatif").max(1_000_000_000).default(0),
+  lokasiTanam: z.string().trim().max(100).optional().nullable(),
+  status: z.nativeEnum(StatusTanaman).optional(),
+  fotoUrl: z.string().trim().url("URL foto tidak valid").max(500).optional().nullable(),
+});
+
 const updateStatusSchema = z.object({
   status: z.nativeEnum(StatusTanaman),
   lokasiTanam: z.string().trim().max(100).optional().nullable(),
@@ -121,6 +132,49 @@ router.post("/", async (req: AuthRequest, res) => {
   });
 
   return res.status(201).json({ data: result });
+});
+
+// PATCH /api/tanaman/:id (Edit data tanaman)
+router.patch("/:id", async (req: AuthRequest, res) => {
+  const parsed = updateTanamanSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "Data edit tanaman tidak valid",
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const id = String(req.params.id);
+  const existing = await prisma.tanaman.findFirst({
+    where: { id, userId: req.userId! },
+  });
+  if (!existing) {
+    return res.status(404).json({ message: "Data tanaman tidak ditemukan." });
+  }
+
+  const { namaTanaman, varietas, tanggalTanam, jumlahBibit, modalAwal, lokasiTanam, status, fotoUrl } =
+    parsed.data;
+
+  const updated = await prisma.tanaman.update({
+    where: { id: existing.id },
+    data: {
+      namaTanaman,
+      varietas: varietas || null,
+      tanggalTanam,
+      jumlahBibit,
+      modalAwal,
+      lokasiTanam: lokasiTanam || null,
+      ...(status ? { status } : {}),
+      ...(fotoUrl !== undefined ? { fotoUrl: fotoUrl || null } : {}),
+    },
+    include: {
+      panen: {
+        orderBy: { tanggalPanen: "desc" },
+      },
+    },
+  });
+
+  return res.json({ data: updated });
 });
 
 // PATCH /api/tanaman/:id/status

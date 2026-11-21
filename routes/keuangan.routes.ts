@@ -16,6 +16,14 @@ const createTransaksiSchema = z.object({
   keterangan: z.string().trim().max(300).optional().nullable(),
 });
 
+const updateTransaksiSchema = z.object({
+  jenis: z.nativeEnum(JenisTransaksi),
+  kategori: z.string().trim().min(2, "Kategori wajib diisi").max(80),
+  nominal: z.coerce.number().positive("Nominal harus lebih dari 0").max(1_000_000_000),
+  tanggal: z.coerce.date(),
+  keterangan: z.string().trim().max(300).optional().nullable(),
+});
+
 // GET /api/keuangan?jenis=PEMASUKAN|PENGELUARAN
 router.get("/", async (req: AuthRequest, res) => {
   const rawJenis = typeof req.query.jenis === "string" ? req.query.jenis : undefined;
@@ -104,6 +112,38 @@ router.post("/", async (req: AuthRequest, res) => {
   });
 
   return res.status(201).json({ data: created });
+});
+
+// PATCH /api/keuangan/:id (Edit transaksi)
+router.patch("/:id", async (req: AuthRequest, res) => {
+  const parsed = updateTransaksiSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: "Data edit transaksi tidak valid",
+      errors: parsed.error.flatten().fieldErrors,
+    });
+  }
+
+  const id = String(req.params.id);
+  const existing = await prisma.transaksi.findFirst({
+    where: { id, userId: req.userId! },
+  });
+  if (!existing) {
+    return res.status(404).json({ message: "Data transaksi tidak ditemukan." });
+  }
+
+  const updated = await prisma.transaksi.update({
+    where: { id: existing.id },
+    data: {
+      jenis: parsed.data.jenis,
+      kategori: parsed.data.kategori,
+      nominal: parsed.data.nominal,
+      tanggal: parsed.data.tanggal,
+      keterangan: parsed.data.keterangan || null,
+    },
+  });
+
+  return res.json({ data: updated });
 });
 
 // DELETE /api/keuangan/:id
