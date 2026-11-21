@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
-import { StatusTanaman } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
-import { requireAuth, AuthRequest } from "../middleware/requireAuth.js";
+import { Prisma, StatusTanaman } from "@prisma/client";
+import { prisma } from "../src/lib/prisma";
+import { requireAuth, AuthRequest } from "../src/middleware/requireAuth";
 
 const router = Router();
 
@@ -59,8 +59,9 @@ router.get("/", async (req: AuthRequest, res) => {
 
 // GET /api/tanaman/:id
 router.get("/:id", async (req: AuthRequest, res) => {
+  const id = String(req.params.id);
   const tanaman = await prisma.tanaman.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id, userId: req.userId! },
     include: {
       panen: {
         orderBy: { tanggalPanen: "desc" },
@@ -88,7 +89,7 @@ router.post("/", async (req: AuthRequest, res) => {
   const { namaTanaman, varietas, tanggalTanam, jumlahBibit, modalAwal, lokasiTanam, status, fotoUrl } =
     parsed.data;
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const tanaman = await tx.tanaman.create({
       data: {
         userId: req.userId!,
@@ -132,8 +133,9 @@ router.patch("/:id/status", async (req: AuthRequest, res) => {
     });
   }
 
+  const id = String(req.params.id);
   const existing = await prisma.tanaman.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id, userId: req.userId! },
   });
   if (!existing) {
     return res.status(404).json({ message: "Data tanaman tidak ditemukan." });
@@ -160,8 +162,9 @@ router.post("/:id/panen", async (req: AuthRequest, res) => {
     });
   }
 
+  const id = String(req.params.id);
   const tanaman = await prisma.tanaman.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id, userId: req.userId! },
   });
   if (!tanaman) {
     return res.status(404).json({ message: "Data tanaman tidak ditemukan." });
@@ -169,7 +172,7 @@ router.post("/:id/panen", async (req: AuthRequest, res) => {
 
   const { tanggalPanen, jumlahHasil, hasilPenjualan, catatan, tandaiSudahPanen } = parsed.data;
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const panen = await tx.panen.create({
       data: {
         tanamanId: tanaman.id,
@@ -208,8 +211,9 @@ router.post("/:id/panen", async (req: AuthRequest, res) => {
 
 // DELETE /api/tanaman/:id
 router.delete("/:id", async (req: AuthRequest, res) => {
+  const id = String(req.params.id);
   const existing = await prisma.tanaman.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id, userId: req.userId! },
   });
   if (!existing) {
     return res.status(404).json({ message: "Data tanaman tidak ditemukan." });

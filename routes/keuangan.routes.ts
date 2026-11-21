@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import { JenisTransaksi, StatusTanaman } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
-import { requireAuth, AuthRequest } from "../middleware/requireAuth.js";
+import { prisma } from "../src/lib/prisma";
+import { requireAuth, AuthRequest } from "../src/middleware/requireAuth";
 
 const router = Router();
 
@@ -64,8 +64,12 @@ router.get("/summary", async (req: AuthRequest, res) => {
     BELUM_PANEN: 0,
     SUDAH_PANEN: 0,
   };
+
   for (const row of countsByStatus) {
-    statusMap[row.status] = row._count._all;
+    const statusKey = row.status as StatusTanaman;
+    if (statusKey in statusMap) {
+      statusMap[statusKey] = row._count._all;
+    }
   }
 
   return res.json({
@@ -104,8 +108,9 @@ router.post("/", async (req: AuthRequest, res) => {
 
 // DELETE /api/keuangan/:id
 router.delete("/:id", async (req: AuthRequest, res) => {
+  const id = String(req.params.id);
   const existing = await prisma.transaksi.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id, userId: req.userId! },
   });
   if (!existing) {
     return res.status(404).json({ message: "Data transaksi tidak ditemukan." });
